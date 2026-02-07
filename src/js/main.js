@@ -1246,8 +1246,9 @@ class App {
       const ctx = canvas.getContext('2d');
 
       const img = new Image();
-      img.src = window.location.origin + this.currentVodBg;
-      img.crossOrigin = "anonymous";
+      // Usar ruta directa, el navegador resuelve. No crossOrigin para assets locales.
+      img.src = this.currentVodBg;
+
       img.onload = () => {
         try {
           ctx.drawImage(img, 0, 0, 1080, 1080);
@@ -1294,121 +1295,92 @@ class App {
           resolve(canvas);
         } catch (e) { reject(e); }
       };
-      img.onerror = () => reject(new Error("Error al cargar el fondo"));
+      img.onerror = (e) => {
+        console.error("Error cargando fondo:", e);
+        reject(new Error("Error al cargar el fondo"));
+      };
     });
   }
 
   async shareVerse(type) {
     this.closeShareModal();
 
-    // Si estamos en el lector e iniciamos el proceso de compartir
+    // Preparar objeto de datos del versículo
+    let verseToShare = this.currentVod;
     if (this.currentView === 'reader' && this.selectedVerse) {
-      if (type === 'image') {
-        const v = this.selectedVerse;
-        this.renderShareVerse({ text: v.text, ref: `${v.book} ${v.chapter}:${v.vNum}`, book: v.book, chapter: v.chapter, vNum: v.vNum });
-        return;
-      } else if (type === 'text') {
-        this.handleCopy();
-        return;
-      }
+      const v = this.selectedVerse;
+      verseToShare = { text: v.text, ref: `${v.book} ${v.chapter}:${v.vNum}` };
+      // Para imagen necesitamos que this.currentVod esté seteado para generateVerseCanvas
+      if (type === 'image') this.currentVod = verseToShare;
     }
 
-    // Comportamiento para Versículo del Día o cuando ya estamos en la vista de compartir
-    if (!this.currentVod) return;
-    const shareText = `"${this.currentVod.text}" \n\n- ${this.currentVod.ref}\nEnviado desde Biblia Cristiana RV 1960`;
+    if (!verseToShare) return;
+
+    const shareText = `"${verseToShare.text}" \n\n- ${verseToShare.ref}\nLeído en Biblia Cristiana RV 1960`;
 
     if (type === 'text') {
-      const data = { title: 'Compartir Versículo', text: shareText };
-      const Capacitor = window.Capacitor;
+      const shareData = { title: 'Versículo Bíblico', text: shareText };
 
-      if (Capacitor && Capacitor.Plugins && Capacitor.Plugins.Share) {
+      // Intentar Web Share API
+      if (navigator.share && navigator.canShare && navigator.canShare(shareData)) {
         try {
-          await Capacitor.Plugins.Share.share({
-            title: 'Compartir Versículo',
-            text: shareText
-          });
-          return;
+          await navigator.share(shareData);
         } catch (e) {
-          console.error("Capacitor share error:", e);
+          if (e.name !== 'AbortError') this.handleCopyText(shareText);
         }
+      } else {
+        // Fallback a portapapeles
+        this.handleCopyText(shareText);
       }
-
-      const shareable = await this.canShareData(data);
-      if (shareable) {
-        try { await navigator.share(shareable); }
-        catch (e) { if (e.name !== 'AbortError') this.handleCopyVod(); }
-      } else { this.handleCopyVod(); }
     } else if (type === 'image') {
-      this.showToast("Preparando imagen...");
+      this.showToast("Creando imagen...");
       try {
         const canvas = await this.generateVerseCanvas();
-        const base64Data = canvas.toDataURL('image/jpeg', 0.9).split(',')[1];
-        const Capacitor = window.Capacitor;
 
-        if (Capacitor && Capacitor.Plugins && Capacitor.Plugins.Filesystem && Capacitor.Plugins.Share) {
-          const Filesystem = Capacitor.Plugins.Filesystem;
-          const Share = Capacitor.Plugins.Share;
+        canvas.toBlob(async (blob) => {
+          if (!blob) {
+            this.showToast("Error generando imagen");
+            return;
+          }
 
-          const writeResult = await Filesystem.writeFile({
-            path: 'temp_share.jpg',
-            data: base64Data,
-            directory: 'CACHE'
-          });
-
-          await Share.share({
-            title: 'Compartir Versículo',
+          const file = new File([blob], "versiculo.jpg", { type: "image/jpeg" });
+          const shareData = {
+            title: 'Versículo Bíblico',
             text: shareText,
-            url: writeResult.uri,
-            dialogTitle: 'Compartir Imagen'
-          });
-        } else {
-          this.fallbackDownload(canvas);
-        }
+            files: [file]
+          };
+
+          // Intentar Web Share API con archivos
+          if (navigator.share && navigator.canShare && navigator.canShare(shareData)) {
+            try {
+              await navigator.share(shareData);
+            } catch (e) {
+              console.warn("Share failed, downloading instead", e);
+              if (e.name !== 'AbortError') this.fallbackDownload(canvas);
+            }
+          } else {
+            // Fallback a descarga directa
+            this.fallbackDownload(canvas);
+          }
+        }, 'image/jpeg', 0.9);
+
       } catch (e) {
         console.error("Share error:", e);
-        this.showToast("Error al compartir imagen.");
+        this.showToast("Error al procesar imagen");
       }
     }
   }
 
+  handleCopyText(text) {
+    navigator.clipboard.writeText(text)
+      .then(() => this.showToast("Copiado al portapapeles"))
+      .catch(() => this.showToast("No se pudo copiar"));
+  }
+
+  // Método legacy eliminado, redirigido a lógica de arriba
   async saveImageDirectly() {
-    this.closeShareModal();
-    if (!this.currentVod) return;
-    this.showToast("Preparando guardado...");
-
-    try {
-      const canvas = await this.generateVerseCanvas();
-      const base64Data = canvas.toDataURL('image/jpeg', 0.9).split(',')[1];
-      const Capacitor = window.Capacitor;
-
-      if (Capacitor && Capacitor.Plugins && Capacitor.Plugins.Filesystem) {
-        const Filesystem = Capacitor.Plugins.Filesystem;
-        const perm = await Filesystem.checkPermissions();
-        if (perm.publicStorage !== 'granted') await Filesystem.requestPermissions();
-
-        const writeResult = await Filesystem.writeFile({
-          path: 'temp_save.jpg',
-          data: base64Data,
-          directory: 'CACHE'
-        });
-
-        if (Capacitor.Plugins.Share) {
-          await Capacitor.Plugins.Share.share({
-            title: 'Guardar Versículo',
-            url: writeResult.uri,
-            dialogTitle: 'Guardar Versículo como...'
-          });
-          this.showToast("Cargando opciones de guardado...");
-        } else {
-          this.fallbackDownload(canvas);
-        }
-      } else {
-        this.fallbackDownload(canvas);
-      }
-    } catch (e) {
-      console.error("Save error:", e);
-      this.showToast("Error al procesar la imagen.");
-    }
+    // Reutilizar lógica de compartir imagen que incluye descarga fallback
+    await this.shareVerse('image');
   }
 
   fallbackDownload(canvas) {
