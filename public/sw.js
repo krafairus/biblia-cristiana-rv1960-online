@@ -1,4 +1,4 @@
-const CACHE_NAME = 'biblia-app-v4'; // Versión 4: Fuentes Locales
+const CACHE_NAME = 'biblia-app-v5'; // Versión 5: Force JSON refresh
 const ASSETS = [
     './',
     './index.html',

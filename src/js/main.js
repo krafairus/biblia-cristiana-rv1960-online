@@ -98,6 +98,9 @@ class App {
 
   renderHome() {
     this.currentView = 'home';
+    const vod = this.db.getVerseOfDay();
+
+    // Menu items (restored 'vod' as requested)
     const menuItems = [
       { text: "Antiguo T.", icon: "book", target: "old" },
       { text: "Nuevo T.", icon: "book-open", target: "new" },
@@ -107,6 +110,7 @@ class App {
       { text: "Favoritos", icon: "heart", target: "favorites" },
       { text: "Notas", icon: "sticky-note", target: "notes" },
       { text: "Marcadores", icon: "highlighter", target: "highlights" },
+      { text: "Buscador", icon: "search", target: "search" },
       { text: "Diccionario", icon: "book-a", target: "dict" },
       { text: "Ajustes", icon: "settings", target: "settings" }
     ];
@@ -114,10 +118,28 @@ class App {
     const html = `
       <header>
         <h1 style="font-family: 'Playfair Display', serif;">Biblia Cristiana</h1>
-        <div style="font-size: 0.8rem; opacity: 0.5; color: var(--accent); margin-right: auto; padding-left: 0.5rem;">RV 1960</div>
-        <button class="btn-icon" onclick="window.app.navigate('settings')">${createIcon('settings')}</button>
+        <div style="font-size: 0.8rem; opacity: 0.5; color: var(--accent); margin-right: auto; padding-left: 0.5rem; margin-bottom: 1rem;">RV 1960</div>
+        <button class="btn-icon" onclick="window.app.navigate('settings')" style="margin-top: auto; margin-left: auto;">${createIcon('settings')}</button>
       </header>
       <div class="view-container animate-entrance">
+        
+        <!-- VERSE OF THE DAY CARD -->
+        <div class="vod-home-card" 
+             onclick="window.app.navigate('vod')"
+             style="background-image: url('./img/bg-verse-4.png');">
+            <div class="vod-home-card-content">
+                <div style="font-size: 0.8rem; text-transform: uppercase; letter-spacing: 2px; margin-bottom: 1rem; opacity: 0.9; font-weight: 700;">Versículo del Día</div>
+                <div class="vod-home-text">
+                    "${vod ? vod.text.replace(/([.,;:])(?=[A-Za-z])/g, '$1 ') : 'Cargando...'}"
+                </div>
+                <div class="vod-home-ref">
+                    ${vod ? `${vod.book} ${vod.chapter}:${vod.verse}` : ''}
+                </div>
+            </div>
+        </div>
+
+        <div style="opacity: 0.6; font-size: 0.9rem; margin-bottom: 1rem; font-weight: 600; text-transform: uppercase; letter-spacing: 1px;">Explorar</div>
+
         <div class="home-grid">
           ${menuItems.map(item => `
             <div class="premium-card" onclick="window.app.navigate('${item.target}')">
@@ -125,7 +147,7 @@ class App {
               <span>${item.text}</span>
             </div>
           `).join('')}
-          <div class="premium-card" style="grid-column: span 2; flex-direction: row; justify-content: center; padding: 1rem;" onclick="window.app.navigate('about')">
+          <div class="premium-card" style="grid-column: 1 / -1; flex-direction: row; justify-content: center; padding: 1.5rem;" onclick="window.app.navigate('about')">
               <div style="display: flex; align-items: center; gap: 0.75rem;">
                 <div style="color: var(--accent);">${createIcon('info')}</div>
                 <span>Acerca de la Aplicación</span>
@@ -171,10 +193,9 @@ class App {
         <h1>${testament === 'old' ? 'Antiguo Testamento' : 'Nuevo Testamento'}</h1>
       </header>
       <div class="view-container animate-entrance">
-        <div style="display: grid; grid-template-columns: 1fr; gap: 0.75rem;">
+        <div class="book-list-grid">
           ${books.map(book => `
-            <div class="premium-card" onclick="window.app.renderChapterList('${book}')" 
-                 style="flex-direction: row; justify-content: space-between; padding: 1.25rem;">
+            <div class="premium-card book-item" onclick="window.app.renderChapterList('${book}')">
               <span style="font-size: 1.1rem;">${book}</span>
               <div style="color: var(--accent); opacity: 0.5;">${createIcon('chevron-right')}</div>
             </div>
@@ -197,11 +218,10 @@ class App {
         <h1>${book}</h1>
       </header>
       <div class="view-container animate-entrance">
-        <p style="opacity: 0.6; font-size: 0.9rem; margin-bottom: 1.5rem; font-weight: 600; text-transform: uppercase; text-align: center;">Seleccionar Capítulo</p>
-        <div style="display: grid; grid-template-columns: repeat(5, 1fr); gap: 0.75rem;">
+        <p class="section-label">Seleccionar Capítulo</p>
+        <div class="chapter-list-grid">
           ${chapters.map(ch => `
-            <div class="premium-card" onclick="window.app.renderReader('${book}', '${ch}')" 
-                 style="aspect-ratio: 1/1; justify-content: center; align-items: center; padding: 0; font-size: 1.1rem; font-weight: 700; border-radius: 12px;">
+            <div class="premium-card chapter-box" onclick="window.app.renderReader('${book}', '${ch}')">
               ${ch}
             </div>
           `).join('')}
@@ -218,19 +238,14 @@ class App {
     const verses = this.db.getVerses(book, chapter);
 
     const html = `
-      <header style="flex-direction: column; align-items: flex-start; gap: 0.5rem; padding-bottom: 0;">
-        <div style="display: flex; align-items: center; gap: 1rem; width: 100%;">
+      <header class="reader-header">
+        <div class="reader-header-top">
           <button class="btn-icon" onclick="window.app.renderChapterList('${book}')">${createIcon('chevron-left')}</button>
           <h1 style="flex-grow: 1; font-size: 1.4rem;">${book}</h1>
-
         </div>
-        <div id="chapter-tabs" style="display: flex; overflow-x: auto; gap: 0.5rem; width: 100%; padding: 0.5rem 0 1rem 0; scrollbar-width: none;">
+        <div id="chapter-tabs" class="chapter-tabs">
           ${chapters.map(ch => `
-            <button class="${ch === chapter ? 'premium-card' : ''}" 
-                    style="padding: 0.4rem 1rem; border: ${ch === chapter ? 'none' : '1px solid var(--glass-border)'}; 
-                           background: ${ch === chapter ? 'var(--accent)' : 'var(--card-bg)'}; 
-                           color: ${ch === chapter ? 'white' : 'var(--text-main)'};
-                           border-radius: 20px; white-space: nowrap; font-size: 0.9rem; font-weight: 600;"
+            <button class="${ch === chapter ? 'premium-card active' : 'premium-card'}" 
                     onclick="window.app.renderReader('${book}', '${ch}')">
               ${ch}
             </button>
@@ -904,33 +919,134 @@ class App {
     this.render(html);
   }
 
+  /* Search View with Modal Filter */
   renderSearch() {
     this.currentView = 'search';
+    const books = this.db.getBooks();
+
+    // Check if we have an active filter stored in memory (not persistent across app restarts, but persists in session view)
+    if (!this.searchFilterValue) this.searchFilterValue = "";
+
     const html = `
       <header>
         <button class="btn-icon" onclick="window.app.navigate('home')">${createIcon('chevron-left')}</button>
         <h1>Buscador</h1>
       </header>
       <div class="view-container animate-entrance">
-        <input type="text" id="search-input" placeholder="¿Qué estás buscando?..." class="search-box">
+        
+        <div style="display: flex; gap: 0.75rem; margin-bottom: 1.5rem; align-items: center;">
+          <input type="text" id="search-input" placeholder="¿Qué estás buscando?..." class="search-box" style="margin-bottom: 0; flex-grow: 1;">
+          <button class="btn-icon" onclick="window.app.openSearchFilterModal()" style="border: 1px solid var(--glass-border); border-radius: 12px; width: 50px; height: 50px; background: var(--card-bg); color: var(--accent);">
+            ${createIcon('filter')}
+          </button>
+        </div>
+
+        <div id="active-filter-indicator" style="margin-bottom: 1rem; display: ${this.searchFilterValue ? 'block' : 'none'};">
+            <span style="background: var(--accent-soft); color: var(--accent); padding: 0.25rem 0.75rem; border-radius: 20px; font-size: 0.85rem; font-weight: 600; display: inline-flex; align-items: center; gap: 0.5rem;">
+                Filtrando por: <b id="filter-name">${this.searchFilterValue}</b>
+                <span onclick="window.app.applySearchFilter('')" style="cursor: pointer; opacity: 0.6;">${createIcon('x')}</span>
+            </span>
+        </div>
+
         <div id="search-results">
+            <div style="text-align: center; opacity: 0.5; margin-top: 3rem;">
+                ${createIcon('search')}
+                <p style="margin-top: 1rem;">Escribe para buscar versículos</p>
+            </div>
+        </div>
+      </div>
+
+      <!-- Modal de Filtro de Búsqueda -->
+      <div id="search-filter-modal" class="modal-overlay">
+        <div class="modal-box" style="max-height: 85vh; display: flex; flex-direction: column;">
+            <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 1rem;">
+                <h2 class="modal-title" style="margin: 0;">Filtrar por Libro</h2>
+                <button class="btn-icon" onclick="window.app.closeSearchFilterModal()">${createIcon('x')}</button>
+            </div>
+            
+            <div style="overflow-y: auto; flex-grow: 1; padding: 0.5rem;" class="search-modal-grid">
+                <button class="premium-card ${this.searchFilterValue === "" ? 'selected' : ''}" 
+                        onclick="window.app.applySearchFilter('')">
+                    Toda la Biblia
+                </button>
+                ${books.map(b => `
+                    <button class="premium-card ${this.searchFilterValue === b ? 'selected' : ''}" 
+                            onclick="window.app.applySearchFilter('${b}')">
+                        ${b}
+                    </button>
+                `).join('')}
+            </div>
         </div>
       </div>
     `;
     this.render(html);
-    document.querySelector('#search-input').addEventListener('input', (e) => {
+
+    const input = document.querySelector('#search-input');
+
+    // Restore previous search if any
+    if (this.lastSearchQuery) {
+      input.value = this.lastSearchQuery;
+      this.performSearch(this.lastSearchQuery, this.searchFilterValue);
+    }
+
+    input.addEventListener('input', (e) => {
       const query = e.target.value;
-      if (query.length > 2) this.performSearch(query);
+      this.lastSearchQuery = query;
+      if (query.length > 2) this.performSearch(query, this.searchFilterValue);
     });
   }
 
-  performSearch(query) {
-    const results = this.db.search(query);
+  openSearchFilterModal() {
+    const modal = document.querySelector('#search-filter-modal');
+    if (modal) modal.classList.add('active');
+  }
+
+  closeSearchFilterModal() {
+    const modal = document.querySelector('#search-filter-modal');
+    if (modal) modal.classList.remove('active');
+  }
+
+  applySearchFilter(book) {
+    this.searchFilterValue = book;
+    this.closeSearchFilterModal();
+
+    // Update UI indicator
+    const indicator = document.querySelector('#active-filter-indicator');
+    const nameEl = document.querySelector('#filter-name');
+
+    if (book) {
+      if (indicator) indicator.style.display = 'block';
+      if (nameEl) nameEl.innerText = book;
+    } else {
+      if (indicator) indicator.style.display = 'none';
+    }
+
+    // Re-run search if query exists
+    const input = document.querySelector('#search-input');
+    if (input && input.value.length > 2) {
+      this.performSearch(input.value, book);
+    } else {
+      // If no search, just re-render to update modal selection state visual (via full re-render or DOM update)
+      // For simplicity/performance, let's just re-render search view to update 'selected' classes in modal next time
+      this.renderSearch();
+      // Note: calling renderSearch will reset focus, but since we are closing modal it's fine.
+      // Restoring query value is handled by this.lastSearchQuery
+    }
+  }
+
+  performSearch(query, bookFilter = '') {
+    const results = this.db.search(query, bookFilter);
     const resultsEl = document.querySelector('#search-results');
+
+    if (results.length === 0) {
+      resultsEl.innerHTML = `<p style="text-align: center; opacity: 0.5; margin-top: 2rem;">No se encontraron resultados.</p>`;
+      return;
+    }
+
     resultsEl.innerHTML = `
-      <p style="margin-bottom: 1.25rem; opacity: 0.5; font-size: 0.9rem;">${results.length} coincidencias encontradas</p>
+      <p style="margin-bottom: 1.25rem; opacity: 0.5; font-size: 0.9rem;">${results.length} coincidencias encontradas ${bookFilter ? `en ${bookFilter}` : ''}</p>
       ${results.map(r => `
-        <div class="premium-card" style="margin-bottom: 1rem; align-items: flex-start; text-align: left;" onclick="window.app.renderReader('${r.book}', '${r.chapter}')">
+        <div class="premium-card" style="margin-bottom: 1rem; align-items: flex-start; text-align: left; cursor: pointer;" onclick="window.app.renderReader('${r.book}', '${r.chapter}')">
           <div style="color: var(--accent); font-size: 0.85rem; margin-bottom: 0.4rem; font-weight: 700;">${r.book} ${r.chapter}:${r.vNum}</div>
           <div style="font-size: 1rem; line-height: 1.5;">${r.text}</div>
         </div>
