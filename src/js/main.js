@@ -143,6 +143,8 @@ class App {
       { text: "Inicio", icon: "home", target: "home" },
       { text: "Antiguo T.", icon: "book", target: "old" },
       { text: "Nuevo T.", icon: "book-open", target: "new" },
+      { text: "Última L.", icon: "history", target: "last" },
+      { text: "Devocional", icon: "coffee", target: "devotional" },
       { text: "Favoritos", icon: "heart", target: "favorites" },
       { text: "Notas", icon: "sticky-note", target: "notes" },
       { text: "Marcadores", icon: "highlighter", target: "highlights" },

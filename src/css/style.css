@@ -155,8 +155,13 @@
   --text-muted: #d4c8b0;
   --accent: #ffca28;
   --accent-soft: rgba(255, 202, 40, 0.15);
-  --glass-border: rgba(255, 255, 255, 0.08);
+  --glass-border: rgba(255, 255, 255, 0.15);
   --shadow: 0 10px 40px rgba(0, 0, 0, 0.4);
+}
+
+[data-style="gold"][data-mode="dark"] .premium-card:not(.active) {
+  color: var(--text-main);
+  border-color: var(--glass-border);
 }
 
 [data-style="ink"] {
